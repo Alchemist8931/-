@@ -3,34 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Kitchen Constructor (WebGL)</title>
+    <title>3D Kitchen Loader (WebGL)</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #111; color: #fff; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; }
         
-        /* UI Panel */
         #ui-panel {
             position: absolute;
             top: 20px; left: 20px;
             width: 240px;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(20, 20, 20, 0.85);
             backdrop-filter: blur(10px);
             padding: 20px;
             border-radius: 8px;
-            border: 1px solid #333;
+            border: 1px solid #444;
             z-index: 10;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
         
         h2 { margin: 0 0 15px 0; font-weight: 300; font-size: 18px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .group { margin-bottom: 20px; }
+        .group label { display: block; font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 8px; }
         
-        .control-group { margin-bottom: 20px; }
-        .control-group label { display: block; font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 8px; }
-        
-        .options-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
         
         .btn {
             background: #333;
-            border: 1px solid #444;
+            border: 1px solid #555;
             color: #ccc;
             padding: 6px 12px;
             border-radius: 4px;
@@ -39,34 +36,29 @@
             transition: 0.2s;
         }
         .btn:hover { background: #444; color: #fff; }
-        .btn.active { background: #555; border-color: #888; color: #fff; }
+        .btn.active { background: #555; border-color: #999; color: #fff; }
 
-        .color-circle {
-            width: 20px; height: 20px;
-            border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.2);
-            display: inline-block;
-            margin-right: 5px;
-            vertical-align: middle;
-        }
-
-        /* Canvas Container */
         #canvas-container { width: 100vw; height: 100vh; }
         
-        /* Loader */
         #loader {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            pointer-events: none;
-            transition: opacity 0.5s;
+            font-size: 14px;
+            z-index: 20;
         }
-        .spinner { width: 40px; height: 40px; border: 3px solid #333; border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        .spinner { 
+            width: 50px; height: 50px; 
+            border: 4px solid rgba(255,255,255,0.1); 
+            border-top-color: #fff; 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+            margin: 0 auto 15px; 
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
     
-    <!-- Подключаем Three.js -->
     <script type="importmap">
         {
             "imports": {
@@ -80,43 +72,32 @@
 
     <div id="loader">
         <div class="spinner"></div>
-        <div>Загрузка сцены...</div>
+        <div id="loading-text">Загрузка модели...</div>
     </div>
 
     <div id="ui-panel">
         <h2>Конструктор</h2>
         
-        <div class="control-group">
-            <label>Материалы фасада</label>
-            <div class="options-row">
-                <button class="btn active" onclick="changeMaterial('facade', '#e8e6e1')">
-                    <span class="color-circle" style="background:#e8e6e1;"></span>Белый
-                </button>
-                <button class="btn" onclick="changeMaterial('facade', '#5d4037')">
-                    <span class="color-circle" style="background:#5d4037;"></span>Дуб
-                </button>
-                <button class="btn" onclick="changeMaterial('facade', '#333')">
-                    <span class="color-circle" style="background:#333;"></span>Графит
-                </button>
+        <div class="group">
+            <label>Фасады</label>
+            <div class="btn-row">
+                <button class="btn active" onclick="updateMaterial('facade', '#e8e6e1')">Белый</button>
+                <button class="btn" onclick="updateMaterial('facade', '#5d4037')">Дерево</button>
+                <button class="btn" onclick="updateMaterial('facade', '#333')">Графит</button>
             </div>
         </div>
 
-        <div class="control-group">
+        <div class="group">
             <label>Столешница</label>
-            <div class="options-row">
-                <button class="btn active" onclick="changeMaterial('counter', '#f0f0f0')">Мрамор</button>
-                <button class="btn" onclick="changeMaterial('counter', '#4e342e')">Дерево</button>
-                <button class="btn" onclick="changeMaterial('counter', '#555')">Камень</button>
+            <div class="btn-row">
+                <button class="btn active" onclick="updateMaterial('top', '#f5f5f5')">Мрамор</button>
+                <button class="btn" onclick="updateMaterial('top', '#3e2723')">Дерево</button>
+                <button class="btn" onclick="updateMaterial('top', '#757575')">Бетон</button>
             </div>
         </div>
-
-        <div class="control-group">
-            <label>Фурнитура</label>
-            <div class="options-row">
-                <button class="btn active" onclick="changeMaterial('handles', '#c0c0c0')">Хром</button>
-                <button class="btn" onclick="changeMaterial('handles', '#d4af37')">Золото</button>
-                <button class="btn" onclick="changeMaterial('handles', '#111')">Чёрный</button>
-            </div>
+        
+        <div style="font-size: 10px; color: #666; margin-top: 15px;">
+            Модель загружена из внешнего источника
         </div>
     </div>
 
@@ -125,184 +106,138 @@
 <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    // Импорт загрузчика моделей (для будущих моделей с 3ddd)
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    // === ИНИЦИАЛИЗАЦИЯ СЦЕНЫ ===
+    // === НАСТРОЙКА СЦЕНЫ ===
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a1a);
+    scene.background = new THREE.Color(0x181818);
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(5, 3, 5); // Позиция камеры
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(4, 2, 4);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true; // Включаем тени
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping; // Кинематографичное освещение
-    renderer.toneMappingExposure = 1.2;
+    renderer.shadowMap.enabled = true;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
     document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-    // Управление камерой (Orbit Controls)
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.target.set(0, 0.5, 0); // Смотрим в центр кухни
+    controls.target.set(0, 0.5, 0);
 
-    // === ОСВЕЩЕНИЕ ===
-    // Мягкое окружающее освещение
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    // === СВЕТ ===
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
-    // Основной направленный свет (Солнце)
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-    dirLight.position.set(5, 10, 7);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+    dirLight.position.set(5, 10, 5);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     dirLight.shadow.camera.near = 0.1;
-    dirLight.shadow.camera.far = 50;
-    dirLight.shadow.camera.left = -10;
-    dirLight.shadow.camera.right = 10;
-    dirLight.shadow.camera.top = 10;
-    dirLight.shadow.camera.bottom = -10;
+    dirLight.shadow.camera.far = 20;
     scene.add(dirLight);
 
-    // === МАТЕРИАЛЫ (PBR) ===
-    // Мы создаем материалы, к которым будем обращаться по имени
-    const materials = {
-        facade: new THREE.MeshStandardMaterial({ 
-            color: 0xe8e6e1, 
-            roughness: 0.3, 
-            metalness: 0.0 
-        }),
-        counter: new THREE.MeshStandardMaterial({ 
-            color: 0xf0f0f0, 
-            roughness: 0.1, 
-            metalness: 0.1 
-        }),
-        handles: new THREE.MeshStandardMaterial({ 
-            color: 0xc0c0c0, 
-            roughness: 0.1, 
-            metalness: 0.8 
-        }),
-        body: new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 })
-    };
-
-    // === ГЕНЕРАЦИЯ "ПРОКСИ" МОДЕЛИ (Вместо загрузки внешней) ===
-    // В реальном проекте вы замените этот блок на загрузчик GLTFLoader
-    const kitchenGroup = new THREE.Group();
-
-    // Пол
-    const floorGeo = new THREE.PlaneGeometry(10, 10);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 0.8 });
+    // === ПЛАТФОРМА (Пол) ===
+    const floorGeo = new THREE.PlaneGeometry(20, 20);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // Стена
-    const wallGeo = new THREE.PlaneGeometry(10, 5);
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf0ede8 });
-    const wall = new THREE.Mesh(wallGeo, wallMat);
-    wall.position.set(0, 2.5, -2);
-    scene.add(wall);
-
-    // Создаем простые геометрические формы, имитирующие кухню
-    // Тумба 1
-    const cabGeo = new THREE.BoxGeometry(1, 0.8, 0.6);
-    const cab1 = new THREE.Mesh(cabGeo, materials.body);
-    cab1.position.set(-1, 0.4, -1.7);
-    cab1.castShadow = true;
-    cab1.receiveShadow = true;
-    kitchenGroup.add(cab1);
-
-    // Фасад тумбы (отдельно для смены цвета)
-    const facadeGeo = new THREE.BoxGeometry(0.98, 0.78, 0.02);
-    const fac1 = new THREE.Mesh(facadeGeo, materials.facade);
-    fac1.position.set(-1, 0.4, -1.4); // Чуть спереди корпуса
-    fac1.castShadow = true;
-    kitchenGroup.add(fac1);
-
-    // Ручка
-    const handleGeo = new THREE.CylinderGeometry(0.01, 0.01, 0.15, 8);
-    const handle1 = new THREE.Mesh(handleGeo, materials.handles);
-    handle1.rotation.x = Math.PI / 2;
-    handle1.position.set(-0.7, 0.5, -1.38);
-    kitchenGroup.add(handle1);
-
-    // Столешница
-    const topGeo = new THREE.BoxGeometry(3, 0.04, 0.65);
-    const counterTop = new THREE.Mesh(topGeo, materials.counter);
-    counterTop.position.set(0, 0.82, -1.7);
-    counterTop.castShadow = true;
-    counterTop.receiveShadow = true;
-    kitchenGroup.add(counterTop);
-
-    // Верхний шкаф
-    const upperCab = new THREE.Mesh(new THREE.BoxGeometry(1, 0.7, 0.35), materials.body);
-    upperCab.position.set(-1, 1.8, -1.8);
-    kitchenGroup.add(upperCab);
+    // === ЗАГРУЗКА МОДЕЛИ ===
     
-    const upperFac = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.68, 0.02), materials.facade);
-    upperFac.position.set(-1, 1.8, -1.62);
-    kitchenGroup.add(upperFac);
-
-    scene.add(kitchenGroup);
+    // Ссылка на модель-пример. 
+    // Вы можете заменить её на ссылку с GitHub (jsdelivr) или другую прямую ссылку.
+    // Например, эта ссылка ведет на стандартную модель Ferrari из примеров Three.js
+    const MODEL_URL = 'https://sketchfab.com/3d-models/kitchen-886911d5e18f43f2821c7424dcc5029c#download:~:text=the%20source%20upload.-,DOWNLOAD,-.glb';
+    
+    // Если у вас есть ссылка на кухню, замените строку выше на вашу, например:
+    // const MODEL_URL = 'https://cdn.jsdelivr.net/gh/user/repo/kitchen.glb';
 
     const loader = new GLTFLoader();
+    let loadedModel = null;
+
+    // Хранилище материалов для перекраски
+    const modelMaterials = {
+        facade: null,
+        top: null,
+        handles: null
+    };
+
     loader.load(
-        'path/to/your/model.glb', // Сюда вставить ссылку на файл
+        MODEL_URL,
         (gltf) => {
-            const model = gltf.scene;
-            model.scale.set(1, 1, 1); // Подгонка размера
-            model.position.set(0, 0, 0);
+            loadedModel = gltf.scene;
             
-            // Важно: проходим по всем частям модели и назначаем им наши материалы
-            // Это делается либо здесь вручную по именам, либо материал должен быть настроен в Blender
-            model.traverse((child) => {
+            // Настраиваем модель
+            loadedModel.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
-                    // Пример логики назначения:
-                    if(child.name.includes('Facade')) child.material = materials.facade;
-                    if(child.name.includes('Handle')) child.material = materials.handles;
+                    
+                    // === ЛОГИКА РАСПРЕДЕЛЕНИЯ МАТЕРИАЛОВ ===
+                    // Так как мы загрузили чужую модель (машину), мы симулируем кухню.
+                    // В реальной модели кухни имена частей будут другими.
+                    // Например: if (child.name.includes('Door')) ...
+                    
+                    // Для Ferrari:
+                    // Кузов машины -> Фасад кухни
+                    if (child.name === 'body') { 
+                        modelMaterials.facade = child.material;
+                    }
+                    // Колеса/детали -> Столешница/Ручки
+                    if (child.name === 'rim_fl') { // Пример колеса
+                        modelMaterials.top = child.material;
+                    }
+                    if (child.name === 'glass') { // Пример стекла
+                         modelMaterials.handles = child.material;
+                    }
                 }
             });
+
+            scene.add(loadedModel);
             
-            scene.add(model);
-            document.getElementById('loader').style.opacity = 0;
+            // Скрываем лоадер
+            document.getElementById('loader').style.display = 'none';
         },
         (xhr) => {
-            console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            // Прогресс загрузки
+            const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
+            document.getElementById('loading-text').innerText = `Загрузка: ${percent}%`;
         },
         (error) => {
-            console.error('Error loading model:', error);
+            console.error('Ошибка загрузки модели:', error);
+            document.getElementById('loading-text').innerText = 'Ошибка загрузки';
         }
     );
 
-    // Скрываем лоадер после генерации прокси
-    document.getElementById('loader').style.opacity = 0;
-
-    // === ЛОГИКА КОНСТРУКТОРА ===
-    window.changeMaterial = (type, colorHex) => {
+    // === УПРАВЛЕНИЕ МАТЕРИАЛАМИ ===
+    window.updateMaterial = (type, colorHex) => {
         const color = new THREE.Color(colorHex);
         
-        if (type === 'facade') {
-            materials.facade.color = color;
-            // Для текстур можно было бы менять map: materials.facade.map = textureLoader.load('wood.jpg');
-        } else if (type === 'counter') {
-            materials.counter.color = color;
-        } else if (type === 'handles') {
-            materials.handles.color = color;
+        // Находим материал в нашем сохраненном списке и меняем цвет
+        if (modelMaterials[type]) {
+            modelMaterials[type].color.set(color);
+            
+            // Если меняем фасад на "дерево", можно добавить шероховатость
+            if (type === 'facade' && colorHex === '#5d4037') {
+                modelMaterials[type].roughness = 0.8;
+                modelMaterials[type].metalness = 0.0;
+            } else if (type === 'facade') {
+                modelMaterials[type].roughness = 0.3;
+                modelMaterials[type].metalness = 0.1;
+            }
         }
         
-        // Обновляем UI
-        const btns = document.querySelectorAll('.control-group .btn');
-        // (Здесь логика переключения активной кнопки для наглядности)
+        // UI active state
+        const btns = document.querySelectorAll('.btn');
+        // (опционально: подсветка активной кнопки)
     };
 
-    // === АНИМАЦИОННЫЙ ЦИКЛ ===
+    // === АНИМАЦИЯ ===
     function animate() {
         requestAnimationFrame(animate);
         controls.update();
