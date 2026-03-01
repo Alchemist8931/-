@@ -57,6 +57,8 @@
             margin: 0 auto 15px; 
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        
+        #error-msg { color: #ff5555; display: none; margin-top: 10px; font-size: 12px; max-width: 200px;}
     </style>
     
     <script type="importmap">
@@ -73,6 +75,7 @@
     <div id="loader">
         <div class="spinner"></div>
         <div id="loading-text">Загрузка модели...</div>
+        <div id="error-msg"></div>
     </div>
 
     <div id="ui-panel">
@@ -97,7 +100,7 @@
         </div>
         
         <div style="font-size: 10px; color: #666; margin-top: 15px;">
-            Модель загружена из внешнего источника
+            Модель загружена с Google Drive
         </div>
     </div>
 
@@ -113,7 +116,8 @@
     scene.background = new THREE.Color(0x181818);
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(4, 2, 4);
+    // Камеру отодвинем чуть дальше, чтобы точно увидеть модель любого размера
+    camera.position.set(5, 3, 5); 
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -127,7 +131,7 @@
     controls.target.set(0, 0.5, 0);
 
     // === СВЕТ ===
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Увеличил яркость
     scene.add(ambientLight);
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 2);
@@ -140,7 +144,7 @@
     scene.add(dirLight);
 
     // === ПЛАТФОРМА (Пол) ===
-    const floorGeo = new THREE.PlaneGeometry(20, 20);
+    const floorGeo = new THREE.PlaneGeometry(50, 50); // Увеличил пол
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
@@ -149,92 +153,127 @@
 
     // === ЗАГРУЗКА МОДЕЛИ ===
     
-    // Ссылка на модель-пример. 
-    // Вы можете заменить её на ссылку с GitHub (jsdelivr) или другую прямую ссылку.
-    // Например, эта ссылка ведет на стандартную модель Ferrari из примеров Three.js
-    const MODEL_URL = 'https://sketchfab.com/3d-models/kitchen-886911d5e18f43f2821c7424dcc5029c#download:~:text=the%20source%20upload.-,DOWNLOAD,-.glb';
-    
-    // Если у вас есть ссылка на кухню, замените строку выше на вашу, например:
-    // const MODEL_URL = 'https://cdn.jsdelivr.net/gh/user/repo/kitchen.glb';
+    // ИСПРАВЛЕННАЯ ССЫЛКА НА GOOGLE DRIVE
+    // Формат: https://drive.google.com/uc?export=download&id=ВАШ_ID
+    // ID из вашей ссылки: 1uGBzZkmHp77-UXd9DyF4FK8dQuwAhn4o
+    const MODEL_URL = 'https://drive.google.com/uc?export=download&id=1uGBzZkmHp77-UXd9DyF4FK8dQuwAhn4o';
 
     const loader = new GLTFLoader();
+    
+    // Хранилища
     let loadedModel = null;
-
-    // Хранилище материалов для перекраски
     const modelMaterials = {
-        facade: null,
-        top: null,
-        handles: null
+        facade: [], // Храним список материалов фасадов
+        top: []     // Храним список материалов столешниц
     };
+
+    const errorDiv = document.getElementById('error-msg');
+    const loadingText = document.getElementById('loading-text');
 
     loader.load(
         MODEL_URL,
         (gltf) => {
             loadedModel = gltf.scene;
             
-            // Настраиваем модель
+            // Центрируем модель при загрузке
+            const box = new THREE.Box3().setFromObject(loadedModel);
+            const center = box.getCenter(new THREE.Vector3());
+            
+            // Сдвигаем модель так, чтобы её низ был на y=0, а центр по x,z был в 0,0
+            loadedModel.position.sub(center);
+            loadedModel.position.y += (box.max.y - box.min.y) / 2;
+            
+            // Управление камерой: подстраиваемся под размер модели
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            camera.position.set(maxDim * 1.5, maxDim, maxDim * 1.5);
+            controls.target.set(0, size.y / 2, 0);
+
+            // === УМНАЯ ЛОГИКА МАТЕРИАЛОВ ===
+            // Мы не знаем названия частей, поэтому будем угадывать по именам
             loadedModel.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
+
+                    const name = child.name.toLowerCase();
                     
-                    // === ЛОГИКА РАСПРЕДЕЛЕНИЯ МАТЕРИАЛОВ ===
-                    // Так как мы загрузили чужую модель (машину), мы симулируем кухню.
-                    // В реальной модели кухни имена частей будут другими.
-                    // Например: if (child.name.includes('Door')) ...
-                    
-                    // Для Ferrari:
-                    // Кузов машины -> Фасад кухни
-                    if (child.name === 'body') { 
-                        modelMaterials.facade = child.material;
+                    // Логика для Фасадов (ищем слова door, front, facade, shutter)
+                    if (name.includes('door') || name.includes('front') || name.includes('facade') || name.includes('shutter')) {
+                        modelMaterials.facade.push(child.material);
                     }
-                    // Колеса/детали -> Столешница/Ручки
-                    if (child.name === 'rim_fl') { // Пример колеса
-                        modelMaterials.top = child.material;
+                    // Логика для Столешницы (ищем top, counter, table)
+                    else if (name.includes('top') || name.includes('counter') || name.includes('table')) {
+                        modelMaterials.top.push(child.material);
                     }
-                    if (child.name === 'glass') { // Пример стекла
-                         modelMaterials.handles = child.material;
+                    // Если ничего не нашли, но материал выглядит как фасад (не металличен, например)
+                    // Это перестраховка, если автор модели называл все Object_001
+                    else {
+                        // Если у материала есть название, проверяем его
+                        if(child.material && child.material.name) {
+                            const matName = child.material.name.toLowerCase();
+                            if(matName.includes('facade') || matName.includes('door')) {
+                                modelMaterials.facade.push(child.material);
+                            }
+                        }
                     }
                 }
             });
+
+            // Если мы ничего не нашли детектированием, применим цвет фасада ко всей модели (кроме пола)
+            if (modelMaterials.facade.length === 0 && modelMaterials.top.length === 0) {
+                console.warn("Авто-определение деталей не сработало. Применяем цвет ко всей модели.");
+                loadedModel.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        modelMaterials.facade.push(child.material);
+                    }
+                });
+            }
 
             scene.add(loadedModel);
             
             // Скрываем лоадер
             document.getElementById('loader').style.display = 'none';
+            console.log("Модель успешно загружена!");
         },
         (xhr) => {
             // Прогресс загрузки
-            const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
-            document.getElementById('loading-text').innerText = `Загрузка: ${percent}%`;
+            if (xhr.total > 0) {
+                const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
+                loadingText.innerText = `Загрузка: ${percent}%`;
+            } else {
+                loadingText.innerText = `Загружено: ${xhr.loaded} байт`;
+            }
         },
         (error) => {
             console.error('Ошибка загрузки модели:', error);
-            document.getElementById('loading-text').innerText = 'Ошибка загрузки';
+            errorDiv.style.display = 'block';
+            errorDiv.innerText = 'Ошибка! Google Disk блокирует загрузку. Попробуйте использовать GitHub или откройте консоль (F12) для деталей.';
+            loadingText.innerText = "Ошибка CORS";
         }
     );
 
     // === УПРАВЛЕНИЕ МАТЕРИАЛАМИ ===
     window.updateMaterial = (type, colorHex) => {
         const color = new THREE.Color(colorHex);
+        const materialsList = modelMaterials[type];
         
-        // Находим материал в нашем сохраненном списке и меняем цвет
-        if (modelMaterials[type]) {
-            modelMaterials[type].color.set(color);
-            
-            // Если меняем фасад на "дерево", можно добавить шероховатость
-            if (type === 'facade' && colorHex === '#5d4037') {
-                modelMaterials[type].roughness = 0.8;
-                modelMaterials[type].metalness = 0.0;
-            } else if (type === 'facade') {
-                modelMaterials[type].roughness = 0.3;
-                modelMaterials[type].metalness = 0.1;
-            }
+        if (materialsList && materialsList.length > 0) {
+            materialsList.forEach(mat => {
+                mat.color.set(color);
+                
+                // Настройки для дерева
+                if (type === 'facade' && colorHex === '#5d4037') {
+                    mat.roughness = 0.8;
+                    mat.metalness = 0.0;
+                } else if (type === 'facade') {
+                    mat.roughness = 0.3;
+                    mat.metalness = 0.1;
+                }
+            });
+        } else {
+            console.warn("Материалы для типа " + type + " не найдены.");
         }
-        
-        // UI active state
-        const btns = document.querySelectorAll('.btn');
-        // (опционально: подсветка активной кнопки)
     };
 
     // === АНИМАЦИЯ ===
