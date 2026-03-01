@@ -5,23 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Kitchen Constructor</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: #fff; }
         
         #ui-panel {
             position: absolute;
             top: 20px; left: 20px;
-            width: 260px;
-            background: rgba(20, 20, 20, 0.9);
+            width: 280px;
+            background: rgba(30, 30, 30, 0.95);
             backdrop-filter: blur(10px);
             padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #333;
+            border-radius: 10px;
+            border: 1px solid #444;
             z-index: 10;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         
-        h2 { margin: 0 0 20px 0; font-weight: 300; font-size: 18px; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        .group { margin-bottom: 20px; }
-        .group label { display: block; font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px;}
+        h2 { margin: 0 0 20px 0; font-weight: 300; font-size: 20px; border-bottom: 1px solid #555; padding-bottom: 10px; }
+        .group { margin-bottom: 25px; }
+        .group label { display: block; font-size: 11px; color: #aaa; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px;}
         
         .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
         
@@ -29,14 +30,28 @@
             background: #333;
             border: 1px solid #555;
             color: #ccc;
-            padding: 8px 12px;
-            border-radius: 4px;
+            padding: 8px 15px;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 11px;
+            font-size: 12px;
             transition: 0.2s;
+            flex: 1;
+            text-align: center;
         }
         .btn:hover { background: #444; color: #fff; border-color: #777; }
         .btn.active { background: #555; border-color: #aaa; color: #fff; }
+
+        select {
+            width: 100%;
+            padding: 8px;
+            background: #222;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+        select:focus { outline: none; border-color: #888; }
 
         #canvas-container { width: 100vw; height: 100vh; }
         
@@ -45,7 +60,7 @@
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            font-size: 14px;
+            font-size: 16px;
             z-index: 20;
         }
         .spinner { 
@@ -58,19 +73,7 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         
-        /* Скрытый лог для отладки */
-        #debug-log {
-            position: absolute;
-            bottom: 10px; right: 10px;
-            background: rgba(0,0,0,0.8);
-            padding: 10px;
-            font-size: 10px;
-            color: #0f0;
-            pointer-events: none;
-            max-height: 100px;
-            overflow: hidden;
-            white-space: pre;
-        }
+        .hint { font-size: 10px; color: #666; margin-top: 5px; line-height: 1.4; }
     </style>
     
     <script type="importmap">
@@ -93,25 +96,32 @@
         <h2>Конструктор</h2>
         
         <div class="group">
-            <label>Фасады</label>
+            <label>Шаг 1: Выберите материал фасада</label>
+            <select id="material-select">
+                <option value="">Загрузка списка...</option>
+            </select>
+            <div class="hint">Выберите материал из списка, который хотите перекрасить.</div>
+        </div>
+
+        <div class="group">
+            <label>Шаг 2: Цвет фасада</label>
             <div class="btn-row">
-                <button class="btn active" onclick="updateMaterial('facade', '#e8e6e1')">Белый</button>
-                <button class="btn" onclick="updateMaterial('facade', '#5d4037')">Дуб</button>
-                <button class="btn" onclick="updateMaterial('facade', '#333')">Графит</button>
+                <button class="btn" onclick="setColor('#e8e6e1')">Белый</button>
+                <button class="btn" onclick="setColor('#5d4037')">Дуб</button>
+                <button class="btn" onclick="setColor('#333')">Графит</button>
+                <button class="btn" onclick="setColor('#1e3a5f')">Синий</button>
             </div>
         </div>
 
         <div class="group">
-            <label>Столешница</label>
+            <label>Цвет столешницы</label>
             <div class="btn-row">
-                <button class="btn active" onclick="updateMaterial('top', '#f5f5f5')">Мрамор</button>
-                <button class="btn" onclick="updateMaterial('top', '#3e2723')">Дерево</button>
-                <button class="btn" onclick="updateMaterial('top', '#757575')">Бетон</button>
+                <button class="btn" onclick="setColor('#f5f5f5')">Мрамор</button>
+                <button class="btn" onclick="setColor('#3e2723')">Дерево</button>
+                <button class="btn" onclick="setColor('#757575')">Бетон</button>
             </div>
         </div>
     </div>
-    
-    <div id="debug-log"></div>
 
     <div id="canvas-container"></div>
 
@@ -120,11 +130,9 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    const log = (msg) => { document.getElementById('debug-log').innerText += msg + '\n'; console.log(msg); };
-
     // === НАСТРОЙКА СЦЕНЫ ===
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x181818);
+    scene.background = new THREE.Color(0x222222); // Немного светлее фон
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(5, 3, 5);
@@ -133,106 +141,102 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
+    renderer.toneMappingExposure = 1.0; // Стандартная экспозиция
     document.getElementById('canvas-container').appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // === СВЕТ ===
-    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    // === УЛУЧШЕННОЕ ОСВЕЩЕНИЕ (Чтобы модель не была черной) ===
+    
+    // 1. Мягкое окружающее освещение (имитация света от стен)
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
+    hemiLight.position.set(0, 20, 0);
+    scene.add(hemiLight);
+
+    // 2. Основной направленный свет (Солнце)
+    const dirLight = new THREE.DirectionalLight(0xffffff, 3);
     dirLight.position.set(10, 20, 10);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     scene.add(dirLight);
 
+    // 3. Дополнительный свет сзади, чтобы не было черных пятен
+    const backLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    backLight.position.set(-10, 10, -10);
+    scene.add(backLight);
+
     // === ПОЛ ===
-    const floorGeo = new THREE.PlaneGeometry(50, 50);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    const floorGeo = new THREE.PlaneGeometry(100, 100);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
     // === ЗАГРУЗКА МОДЕЛИ ===
-    
-    // Используем относительный путь, так как файл лежит рядом
     const MODEL_URL = './kitchen.glb'; 
     
     const loader = new GLTFLoader();
-    const modelMaterials = {
-        facade: [], // Список материалов фасадов
-        top: [],    // Список материалов столешниц
-        handles: [] // Список материалов ручек
-    };
+    const materialSelect = document.getElementById('material-select');
+    
+    // Карта материалов: Имя -> Объект материала
+    const materialsMap = new Map();
 
     loader.load(
         MODEL_URL,
         (gltf) => {
             const model = gltf.scene;
             
-            // 1. Автоматический подбор масштаба и позиции
+            // 1. Автоматический подбор масштаба
             const box = new THREE.Box3().setFromObject(model);
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
             
-            // Выравниваем модель по полу
-            model.position.y = -box.min.y;
-            // Центрируем по горизонтали
+            model.position.y = -box.min.y; // На пол
             model.position.x = -center.x;
             model.position.z = -center.z;
 
-            // Настраиваем камеру, чтобы вся модель была видна
+            // Настройка камеры
             const maxDim = Math.max(size.x, size.y, size.z);
             const fov = camera.fov * (Math.PI / 180);
             let cameraZ = Math.abs(maxDim / Math.sin(fov / 2)) * 0.8;
-            
             camera.position.set(cameraZ * 0.5, cameraZ * 0.5, cameraZ);
             controls.target.set(0, size.y / 2, 0);
             controls.update();
 
-            // 2. Умное распределение материалов
-            log("--- Загрузка завершена ---");
-            
+            // 2. Сбор всех материалов для списка
             model.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
-                    
-                    // Собираем имена для отладки
-                    const name = child.name.toLowerCase();
-                    const matName = child.material ? child.material.name.toLowerCase() : "";
-                    
-                    // Логика поиска:
-                    // Ищем фасады по ключевым словам
-                    if (name.includes('door') || name.includes('facade') || name.includes('front') || 
-                        matName.includes('facade') || matName.includes('door') || matName.includes('white')) {
-                        modelMaterials.facade.push(child.material);
-                        log(`Found Facade: ${child.name}`);
+
+                    // Делаем материал двусторонним (чтобы не исчезали стены при взгляде внутри)
+                    if (child.material) {
+                        child.material.side = THREE.DoubleSide;
                     }
-                    // Ищем столешницу
-                    else if (name.includes('top') || name.includes('counter') || name.includes('table') ||
-                             matName.includes('top') || matName.includes('counter')) {
-                        modelMaterials.top.push(child.material);
-                        log(`Found Top: ${child.name}`);
-                    }
-                    // Ищем ручки
-                    else if (name.includes('handle') || name.includes('knob') || name.includes('metal')) {
-                        modelMaterials.handles.push(child.material);
-                        log(`Found Handle: ${child.name}`);
+
+                    // Собираем уникальные материалы
+                    if (child.material) {
+                        // Если материал используется несколькими мешами, Map гарантирует уникальность
+                        if (!materialsMap.has(child.material.name)) {
+                            materialsMap.set(child.material.name, child.material);
+                        }
                     }
                 }
             });
 
-            // Если ничего не нашли по именам, красим всё в "Фасад" (кроме того, что похоже на пол)
-            if (modelMaterials.facade.length === 0 && modelMaterials.top.length === 0) {
-                log("Имена не найдены, применяем цвет ко всей модели");
-                model.traverse(child => {
-                    if(child.isMesh) modelMaterials.facade.push(child.material);
-                });
-            }
+            // Заполняем выпадающий список
+            materialSelect.innerHTML = '<option value="">-- Выберите материал --</option>';
+            materialsMap.forEach((value, key) => {
+                const opt = document.createElement('option');
+                // Если имя пустое, даем дефолтное
+                const name = key ? key : `Material_${value.id}`;
+                opt.value = key; // используем имя как ключ
+                opt.innerText = name;
+                materialSelect.appendChild(opt);
+            });
 
             scene.add(model);
             document.getElementById('loader').style.display = 'none';
@@ -243,35 +247,35 @@
         },
         (error) => {
             console.error(error);
-            document.getElementById('loading-text').innerText = 'Ошибка загрузки файла.';
+            document.getElementById('loading-text').innerText = 'Ошибка загрузки файла. Проверьте консоль (F12).';
             document.getElementById('loading-text').style.color = '#ff4444';
-            log("ОШИБКА: Проверьте, запущен ли локальный сервер.");
-            log("Если вы открываете файл просто с диска, браузер заблокирует загрузку.");
         }
     );
 
     // === УПРАВЛЕНИЕ МАТЕРИАЛАМИ ===
-    window.updateMaterial = (type, colorHex) => {
-        const color = new THREE.Color(colorHex);
-        const list = modelMaterials[type];
+    window.setColor = (colorHex) => {
+        const selectedName = materialSelect.value;
         
-        if (list && list.length > 0) {
-            list.forEach(mat => {
-                mat.color.set(color);
-                
-                // Настройки пластика/дерева
-                if (type === 'facade') {
-                    if (colorHex === '#5d4037') {
-                        mat.roughness = 0.7; // Дерево более шершавое
-                        mat.metalness = 0.0;
-                    } else {
-                        mat.roughness = 0.3; // Глянец
-                        mat.metalness = 0.0;
-                    }
-                }
-            });
-        } else {
-            console.warn("Материалы типа " + type + " не найдены в модели.");
+        if (!selectedName) {
+            alert("Пожалуйста, выберите материал из списка выше, чтобы перекрасить.");
+            return;
+        }
+
+        const material = materialsMap.get(selectedName);
+        
+        if (material) {
+            material.color.set(colorHex);
+            
+            // Сбрасываем текстуру, если она была (иначе цвет не видно под текстурой)
+            // Сохраняем возможность вернуть текстуры, но для смены цвета это необходимо
+            if (material.map) {
+                material.map = null; 
+                material.needsUpdate = true;
+            }
+            
+            // Настройки свойств
+            material.roughness = 0.4;
+            material.metalness = 0.1;
         }
     };
 
